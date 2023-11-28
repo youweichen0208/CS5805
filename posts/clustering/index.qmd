@@ -1,0 +1,105 @@
+---
+title: "Clustering"
+author: "Youwei Chen"
+date: "2023-11-25"
+categories: [Machine Learning, Python, Clustering]
+jupyter:
+  kernelspec:
+    name: python3
+    display_name: Python 3
+    language: python
+---
+
+### 1. Document Clustering Introduction:
+
+Clustering is a fundamental technique in machine learning that involves grouping data with close and similar properties/patterns together. This blog specifically focuses on document clustering and makes an analysis of finding the sentences with closest and highest similarities. There are a couple of steps to achieve this in the later sections: 1. data clean and initialization 2. compute the cosine distance 3. find the closest cluster 4. merge 5. visualization
+
+### 2. Import the libraries:
+
+```{python}
+import re
+from collections import Counter
+import pandas as pd
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from scipy.cluster.hierarchy import dendrogram, linkage
+from matplotlib import pyplot as plt
+from scipy.spatial.distance import cosine
+```
+
+### 3. Open the document file:
+
+Below is the code to open the "words.txt" file and each line is an element in the **sentences** list.
+
+```{python}
+with open('words.txt', 'r') as file:
+    sentences = file.readlines()
+sentences
+```
+
+### 4. Tokenization and Data Clean:
+
+For each sentence in the document, it first converts the sentence to lowercase, tokenize the sentence, and removes the empty words. The **tokenized_sentences** contains a list of cleaned words. Also, the **unique_words** contains all unique words found across the sentences in the document.
+
+```{python}
+unique_words = set()
+tokenized_sentences = []
+
+for sentence in sentences:
+    sentence = sentence.lower()
+    words = re.split('[^a-z]', sentence)
+    words = [word for word in words if word]
+    tokenized_sentences.append(words)
+    unique_words.update(words)
+len(tokenized_sentences)
+```
+
+### 5. **Dataframe** setup:
+
+The **dataframe** is structured to represent the frequency count of each unique word across sentences. Its columns correspond to the unique words, and each row corresponds to a sentence. The **dataframe** serves as the representation of the frequency distribution of words in the document.
+
+```{python}
+sentences_df = pd.DataFrame(index=range(len(tokenized_sentences)), columns=list(unique_words))
+sentences_df.fillna(0, inplace=True)
+
+for idx, sentence in enumerate(tokenized_sentences):
+    for word in sentence:
+        sentences_df.loc[idx, word] += 1
+sentences_df
+```
+
+### 6. Compute the cosine distance:
+
+Cosine distance is often used as the measure of text similarity between sentences. The code below computes the cosine distance for each sentence in the Dataframe with respect to the sentence at index 2. The **cosine_distance** is the collection that represents the distance of the sentence at index 2 to the other sentences(include index 2).
+
+```{python}
+num_rows = sentences_df.shape[0]
+cosine_distance = [cosine(sentences_df.loc[2], sentences_df.loc[i]) for i in range(num_rows)]
+cosine_distance
+```
+
+### 7. Sort and find the two sentences with the closest distance:
+
+In the previous section, we computed the cosine distance and got a list of distances to the sentence at index 2. Now this section is to sort the list and get 2 closest sentences to the sentence at index 2.
+
+```{python}
+indexed_distances = list(enumerate(cosine_distance))
+sorted_distances = sorted(indexed_distances, key=lambda x: x[1])
+closest_sentences = sorted_distances[1:3]
+closest_sentences
+```
+
+As we can see from the output, the two closest sentences to the sentence at index 2 are the sentence at index 8 and sentence at index 9. In the next section we will use dendrogram to verify and visualize the cosine distances.
+
+### 8. Visualization using dendrogram:
+
+A dendrogram is a very useful visualization diagram that displays the sequence of merges in hierarchical clustering. By looking at the dendrogram, we can get a sense of how closely related clusters are.
+
+```{python}
+visual = linkage(sentences_df, method='single', metric="cosine")
+fig = plt.figure(figsize=(5, 5))
+dn = dendrogram(visual)
+plt.show()
+```
+
+As we can see in the dendrogram, the sentence at index 8 and the sentence at index 9 are exactly the closest distance to the sentence at index 2, which matches with the answers in section 7.

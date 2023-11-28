@@ -1,0 +1,14 @@
+{
+  "hash": "c8834ff138b50398848dcf81ee570946",
+  "result": {
+    "markdown": "---\ntitle: \"Anomaly/outlier detection\"\nauthor: \"Youwei Chen\"\ndate: \"2023-09-12\"\ncategories: [news, code, analysis]\nimage: \"image.jpg\"\n---\n\n\nThis is a post with executable code.\n\n\n::: {.cell}\n\n```{.r .cell-code}\n1 + 1\n```\n\n::: {.cell-output .cell-output-stdout}\n```\n[1] 2\n```\n:::\n:::\n",
+    "supporting": [],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}

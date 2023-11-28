@@ -1,0 +1,122 @@
+---
+title: "Probability theory and random variables"
+author: "Youwei Chen"
+date: "2023-11-22"
+categories: [machine learning, python, data visualization]
+image: "image.jpg"
+jupyter:
+  kernelspec:
+    name: python3
+    display_name: Python 3
+    language: python
+---
+
+### 1. Use Case: Email spam detection
+
+The goal of this blog is to develop a detection system and data visualization for email spams.Each email's text in the dataset can be considered as a `random variable`. We will use `The Naive Bayers` model and `probablity theory` to analyze the probability that an email is spam given the text in that email. The process involves training the Naive Bayes model using a provided dataset, enabling the model to learn and make predictions on new, unseen data.
+
+### 2. Import the libraries:
+
+```{python}
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import roc_curve, auc
+import matplotlib.pyplot as plt
+```
+
+### 3. Display the dataset
+
+Below is the code to load "emails.csv" file into the pandas dataframe.
+
+```{python}
+email_df = pd.read_csv("emails.csv")
+email_df['category'] = email_df['spam'].replace({1: 'spam', 0: 'not spam'})
+email_df
+```
+
+### 4. groupby based on category column ("spam"" and "not spam")
+
+`groupby` will group the `spam` and `not spam` in the `category` column, and it will provide us with detailed analysis of the groups `spam` and `not spam`.
+
+```{python}
+email_df.groupby('category').describe()
+```
+
+### 5. use `scikit-learn` to split data into training set:
+
+To evaluate the model, `train_test_split` is used to split spam email dataset into training and testing sets. In this case, 20% of the data will be used for tesing, and 80% of the data will be used for training. Additionally, `CountVectorizer` is applied to convert the text data into a matrix of words counts, and `fit_transform` is used to fit the vectorizer to the training data and build the model.
+
+```{python}
+x_train, x_test, y_train, y_test = train_test_split(email_df.text, email_df.spam, test_size=0.20)
+cv = CountVectorizer()
+x_train_count = cv.fit_transform(x_train.values)
+x_train_count.toarray()
+```
+
+### 6. create a Multinomial Bayes model:
+
+It will train the model, which enables it to make predictions on new data.
+
+```{python}
+#train model
+model = MultinomialNB()
+model.fit(x_train_count, y_train)
+```
+
+### 7. Below is the examples of spam and non-spam emails:
+
+#### **example 1:**
+
+```{python}
+email_ham = ["Please come prepared with any updates or materials you'd like to share with the team."]
+email_ham_count = cv.transform(email_ham)
+model.predict(email_ham_count)
+```
+
+The message in the example 1 is not a spam email, and it appears to be the team communication in a business context. The training model also gives a value of 0 which means it predicts that it is not a spam email.
+
+#### **example 2:**
+
+```{python}
+# pre-test spam
+email_spam = ["ou are the lucky winner of our exclusive giveaway! 🥳 You've won a brand new iPhone 12 and a $500 shopping voucher!"]
+email_spam_count = cv.transform(email_spam)
+model.predict(email_spam_count)
+```
+
+The message in the example 2 is a `spam` email, and it appears to be one of the tricks to promote their products. The training model also gives a value of 1 which means it predicts that it is a spam email.
+
+### 8. Prediction accuracy:
+
+Below shows the accuracy of the model on the test data.
+
+```{python}
+x_test_count = cv.transform(x_test)
+model.score(x_test_count, y_test)
+```
+
+### 9. ROC curve to evaluate the performance of our email spam detection system:
+
+The ROC curve is used to understand and visualize the performance of our email spam detection system. To interpret ROC curve, the closer the ROC curve to the true postive rate axis, the better the model's performance.
+
+```{python}
+y_prob = model.predict_proba(x_test_count)[:, 1]
+
+# Compute the ROC curve
+fpr, tpr, thresholds = roc_curve(y_test, y_prob)
+
+roc_auc = auc(fpr, tpr)
+plt.figure()
+plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % roc_auc)
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.0])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic')
+plt.legend(loc="lower right")
+plt.show()
+```
