@@ -1,13 +1,180 @@
 ---
 title: "Classification"
 author: "Youwei Chen"
-date: "2023-11-20"
-categories: [news, code, analysis]
+date: "2023-11-28"
+categories: [NLP, code, sentiment analysis, classification]
 image: "image.jpg"
 ---
 
-This is a post with executable code.
+### 1. Introduction:
 
-```{r}
-1 + 1
+This blog will utilize both rule-based VADER sentiment analysis tool and machine learning pre-trained RoBERTa model to perform analysis of sentiment in Amazon reviews. It will apply sentiment analysis models to classify reviews into categories such as "positive", "neutral", and "negative". The visualizations at end will also show the relationship between different sentiment classifiers.
+
+### 2. Import the libraries:
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
+from tqdm.notebook import tqdm 
+from scipy.special import softmax
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 ```
+
+### 3. Load the amazon_reviews csv file:
+
+```{python}
+amazon_df = pd.read_csv("amazon_reviews.csv")
+```
+
+### 4. Bar plot to show the number of reviews in different ratings:
+
+```{python}
+vis = amazon_df['rating'].value_counts().sort_index().plot(kind='bar', title='number of reviews vs. ratings', figsize=(10,5))
+vis.set_xlabel("Review ratings")
+vis.set_ylabel("number of reviews")
+vis.set_xticklabels(vis.get_xticklabels(), rotation=1)
+plt.show()
+```
+
+### 5. Apply SentimentIntensityAnalyzer:
+
+The code below uses the VADER sentiment analysis tool from NLTK to give scores for each Amazon reviews. Based on the scores, the new column **sentiment** will classify 'negative', 'positive', 'neutral' based on the scores. The dataframe **vader_nltk** stores polarity scores and sentiment labels.
+
+```{python}
+def get_sentiment(score):
+    if score < -0.05:
+        return 'negative'
+    elif score > 0.05:
+        return 'positive'
+    else:
+        return 'neutral'
+
+sia = SentimentIntensityAnalyzer()
+res = {}
+for i, row in tqdm(amazon_df.iterrows(), total=len(amazon_df)):
+    text = str(row['reviewText'])
+    myid = row['id']
+    polarity_scores = sia.polarity_scores(text)
+    res[myid] = {**polarity_scores, 'sentiment': get_sentiment(polarity_scores['compound'])}
+
+vader_nltk = pd.DataFrame.from_dict(res, orient='index').reset_index()
+vader_nltk.columns = ['id'] + list(vader_nltk.columns[1:])
+vader_nltk = pd.merge(vader_nltk, amazon_df, on='id', how='left')
+vader_nltk.head()
+```
+
+### 6. the boxplot to show the distribution of 'neg', 'neu', 'pos' for each rating.
+
+```{python}
+fig, axs = plt.subplots(1, 3, figsize=(15,5))
+sns.boxplot(data=vader_nltk, x='rating', y='neg', ax=axs[0])
+sns.boxplot(data=vader_nltk, x='rating', y='neu', ax=axs[1])
+sns.boxplot(data=vader_nltk, x='rating', y='pos', ax=axs[2])
+axs[0].set_title('Negative sentiment')
+axs[1].set_title('Neutral sentiment')
+axs[2].set_title('Positive sentiment')
+plt.tight_layout()
+plt.show()
+```
+
+### 7. Hugging Face Transformers to load a pre-trained model:
+
+It sets up a sentiment analysis model based on RoBERTa architecture for analyzing the Amazon reviews.
+
+```{python}
+MODEL = "cardiffnlp/twitter-roberta-base-sentiment"
+tokenizer = AutoTokenizer.from_pretrained(MODEL)
+model = AutoModelForSequenceClassification.from_pretrained(MODEL)
+```
+
+### 8. VADER Sentiment analysis vs. RoBERTa Model Sentiment Analysis:
+
+##### (1). VADER score about the review at index 30:
+
+```{python}
+example_review = amazon_df['reviewText'][30]
+example_review
+print("Vader sentiment analysis scores for the review at index 30 is ", sia.polarity_scores(example_review))
+```
+
+##### (2).RoBERTa score about the review at index 30:
+
+```{python}
+encoded_review = tokenizer(example_review, return_tensors='pt')
+output = model(**encoded_review)
+scores = output[0][0].detach().numpy()
+scores = softmax(scores)
+scores_dict = {
+  'roberta_neg': scores[0],
+  'roberta_neu': scores[1],
+  'roberta_pos': scores[2]
+}
+
+print("Roberta scores for the review at index 30 is ", scores_dict)
+```
+
+### 9. RoBERTa score and VADER score Integration:
+
+The **res** dictionary combines and contains both the VADER sentiment analysis result and the pre-trained model RoBERTa model's result.
+
+```{python}
+def roberta_scores(example_review):
+  encoded_review = tokenizer(example_review, return_tensors='pt')
+  output = model(**encoded_review)
+  scores = output[0][0].detach().numpy()
+  scores = softmax(scores)
+  scores_dict = {
+    'roberta_neg': scores[0],
+    'roberta_neu': scores[1],
+    'roberta_pos': scores[2]
+  }
+  return scores_dict
+res = {}
+for i, row in tqdm(amazon_df.iterrows(), total=len(amazon_df)):
+    try:
+        review = row['reviewText']
+        review_id = row['id']
+        if isinstance(review, str):
+            vader_result = sia.polarity_scores(review)
+            vader_result2 = {f"vader_{key}": value for key, value in vader_result.items()}
+            roberta_result = roberta_scores(review)
+            res[review_id] = {**vader_result2, **roberta_result}
+        else:
+            print(f'Skipped id: {review_id} due to non-string review')
+    except RuntimeError:
+        continue
+dict_list = list(res.items())[:5]
+for item in dict_list:
+    print(item)
+```
+
+### 10. Merge into dataframe:
+
+```{python}
+model_df = pd.DataFrame(res).T
+model_df = model_df.reset_index().rename(columns={'index':'id'})
+model_df = model_df.merge(amazon_df, how='left')
+model_df.head()
+```
+
+### 11. Heatmap to show the relationship between VADER Sentiment analysis tool and RoBERTa training model:
+
+The heatmap is applied here to explore the correlation between the VADER model classifications and the RoBERTa model classifications.
+
+```{python}
+plt.figure(figsize=(4, 3))
+correlation = model_df[['vader_neg', 'vader_neu', 'vader_pos', 'roberta_neg', 'roberta_neu', 'roberta_pos']].corr()
+sns.heatmap(correlation, annot=True, cmap='coolwarm')
+plt.tight_layout()
+plt.show()
+```
+
+From the heatmap shown above, the correlation coefficient of two models' relationship:
+
+1.  **vader_neg - roberta_neg:** 0.35
+2.  **vader_neu - roberta_neu:** 0.36
+3.  **vader_pos - roberta_pos:** 0.5

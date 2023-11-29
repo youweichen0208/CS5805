@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Youwei Chen">
-<meta name="dcterms.date" content="2023-11-20">
+<meta name="dcterms.date" content="2023-11-28">
 
 <title>CS5805 - Classification</title>
 <style>
@@ -95,6 +95,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     "search-label": "Search"
   }
 }</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+<script src="https://unpkg.com/@jupyter-widgets/html-manager@*/dist/embed-amd.js" crossorigin="anonymous"></script>
 
 
 <link rel="stylesheet" href="../../styles.css">
@@ -144,9 +148,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div class="quarto-title column-body">
       <h1 class="title">Classification</h1>
                                 <div class="quarto-categories">
-                <div class="quarto-category">news</div>
+                <div class="quarto-category">NLP</div>
                 <div class="quarto-category">code</div>
-                <div class="quarto-category">analysis</div>
+                <div class="quarto-category">sentiment analysis</div>
+                <div class="quarto-category">classification</div>
               </div>
                   </div>
   </div>
@@ -164,7 +169,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">November 20, 2023</p>
+        <p class="date">November 28, 2023</p>
       </div>
     </div>
     
@@ -182,17 +187,493 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<p>This is a post with executable code.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span> <span class="sc">+</span> <span class="dv">1</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<section id="introduction" class="level3">
+<h3 class="anchored" data-anchor-id="introduction">1. Introduction:</h3>
+<p>This blog will utilize both rule-based VADER sentiment analysis tool and machine learning pre-trained RoBERTa model to perform analysis of sentiment in Amazon reviews. It will apply sentiment analysis models to classify reviews into categories such as “positive”, “neutral”, and “negative”. The visualizations at end will also show the relationship between different sentiment classifiers.</p>
+</section>
+<section id="import-the-libraries" class="level3">
+<h3 class="anchored" data-anchor-id="import-the-libraries">2. Import the libraries:</h3>
+<div class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> seaborn <span class="im">as</span> sns</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> nltk</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> nltk.sentiment <span class="im">import</span> SentimentIntensityAnalyzer</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> tqdm.notebook <span class="im">import</span> tqdm </span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.special <span class="im">import</span> softmax</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> transformers <span class="im">import</span> AutoTokenizer, AutoModelForSequenceClassification</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="load-the-amazon_reviews-csv-file" class="level3">
+<h3 class="anchored" data-anchor-id="load-the-amazon_reviews-csv-file">3. Load the amazon_reviews csv file:</h3>
+<div class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>amazon_df <span class="op">=</span> pd.read_csv(<span class="st">"amazon_reviews.csv"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="bar-plot-to-show-the-number-of-reviews-in-different-ratings" class="level3">
+<h3 class="anchored" data-anchor-id="bar-plot-to-show-the-number-of-reviews-in-different-ratings">4. Bar plot to show the number of reviews in different ratings:</h3>
+<div class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>vis <span class="op">=</span> amazon_df[<span class="st">'rating'</span>].value_counts().sort_index().plot(kind<span class="op">=</span><span class="st">'bar'</span>, title<span class="op">=</span><span class="st">'number of reviews vs. ratings'</span>, figsize<span class="op">=</span>(<span class="dv">10</span>,<span class="dv">5</span>))</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>vis.set_xlabel(<span class="st">"Review ratings"</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>vis.set_ylabel(<span class="st">"number of reviews"</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>vis.set_xticklabels(vis.get_xticklabels(), rotation<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="index_files/figure-html/cell-4-output-1.png" width="825" height="450"></p>
+</div>
+</div>
+</section>
+<section id="apply-sentimentintensityanalyzer" class="level3">
+<h3 class="anchored" data-anchor-id="apply-sentimentintensityanalyzer">5. Apply SentimentIntensityAnalyzer:</h3>
+<p>The code below uses the VADER sentiment analysis tool from NLTK to give scores for each Amazon reviews. Based on the scores, the new column <strong>sentiment</strong> will classify ‘negative’, ‘positive’, ‘neutral’ based on the scores. The dataframe <strong>vader_nltk</strong> stores polarity scores and sentiment labels.</p>
+<div class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_sentiment(score):</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> score <span class="op">&lt;</span> <span class="op">-</span><span class="fl">0.05</span>:</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">'negative'</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> score <span class="op">&gt;</span> <span class="fl">0.05</span>:</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">'positive'</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">'neutral'</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>sia <span class="op">=</span> SentimentIntensityAnalyzer()</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> {}</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, row <span class="kw">in</span> tqdm(amazon_df.iterrows(), total<span class="op">=</span><span class="bu">len</span>(amazon_df)):</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    text <span class="op">=</span> <span class="bu">str</span>(row[<span class="st">'reviewText'</span>])</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    myid <span class="op">=</span> row[<span class="st">'id'</span>]</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    polarity_scores <span class="op">=</span> sia.polarity_scores(text)</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    res[myid] <span class="op">=</span> {<span class="op">**</span>polarity_scores, <span class="st">'sentiment'</span>: get_sentiment(polarity_scores[<span class="st">'compound'</span>])}</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>vader_nltk <span class="op">=</span> pd.DataFrame.from_dict(res, orient<span class="op">=</span><span class="st">'index'</span>).reset_index()</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>vader_nltk.columns <span class="op">=</span> [<span class="st">'id'</span>] <span class="op">+</span> <span class="bu">list</span>(vader_nltk.columns[<span class="dv">1</span>:])</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>vader_nltk <span class="op">=</span> pd.merge(vader_nltk, amazon_df, on<span class="op">=</span><span class="st">'id'</span>, how<span class="op">=</span><span class="st">'left'</span>)</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>vader_nltk.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<script type="application/vnd.jupyter.widget-view+json">
+{"model_id":"3e1fff0886a149d8b992e9d167395552","version_major":2,"version_minor":0,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
+</script>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">id</th>
+<th data-quarto-table-cell-role="th">neg</th>
+<th data-quarto-table-cell-role="th">neu</th>
+<th data-quarto-table-cell-role="th">pos</th>
+<th data-quarto-table-cell-role="th">compound</th>
+<th data-quarto-table-cell-role="th">sentiment</th>
+<th data-quarto-table-cell-role="th">reviewerName</th>
+<th data-quarto-table-cell-role="th">rating</th>
+<th data-quarto-table-cell-role="th">reviewText</th>
+<th data-quarto-table-cell-role="th">reviewTime</th>
+<th data-quarto-table-cell-role="th">day_diff</th>
+<th data-quarto-table-cell-role="th">helpful_yes</th>
+<th data-quarto-table-cell-role="th">helpful_no</th>
+<th data-quarto-table-cell-role="th">total_vote</th>
+<th data-quarto-table-cell-role="th">score_pos_neg_diff</th>
+<th data-quarto-table-cell-role="th">score_average_rating</th>
+<th data-quarto-table-cell-role="th">wilson_lower_bound</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>0</td>
+<td>0.688</td>
+<td>0.312</td>
+<td>0.000</td>
+<td>-0.2960</td>
+<td>negative</td>
+<td>NaN</td>
+<td>4.0</td>
+<td>No issues.</td>
+<td>2014-07-23</td>
+<td>138</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0.0</td>
+<td>0.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>2</td>
+<td>0.077</td>
+<td>0.923</td>
+<td>0.000</td>
+<td>-0.3089</td>
+<td>negative</td>
+<td>1K3</td>
+<td>4.0</td>
+<td>it works as expected. I should have sprung for...</td>
+<td>2012-12-23</td>
+<td>715</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0.0</td>
+<td>0.0</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>11</td>
+<td>0.000</td>
+<td>1.000</td>
+<td>0.000</td>
+<td>0.0000</td>
+<td>neutral</td>
+<td>98020</td>
+<td>3.0</td>
+<td>It works, but file writes are a bit slower tha...</td>
+<td>2013-11-20</td>
+<td>383</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0.0</td>
+<td>0.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>32</td>
+<td>0.088</td>
+<td>0.774</td>
+<td>0.138</td>
+<td>0.5255</td>
+<td>positive</td>
+<td>Abdulrahman J. Alrashed "dr34m3r"</td>
+<td>1.0</td>
+<td>I bought 2 of those SanDisk 32 GB microSD , us...</td>
+<td>2013-03-08</td>
+<td>640</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0.0</td>
+<td>0.0</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>33</td>
+<td>0.000</td>
+<td>0.632</td>
+<td>0.368</td>
+<td>0.9153</td>
+<td>positive</td>
+<td>Abel Feliciano "Ace Master"</td>
+<td>4.0</td>
+<td>The memory card is an excellent condition and ...</td>
+<td>2012-11-09</td>
+<td>759</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0.0</td>
+<td>0.0</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+</section>
+<section id="the-boxplot-to-show-the-distribution-of-neg-neu-pos-for-each-rating." class="level3">
+<h3 class="anchored" data-anchor-id="the-boxplot-to-show-the-distribution-of-neg-neu-pos-for-each-rating.">6. the boxplot to show the distribution of ‘neg’, ‘neu’, ‘pos’ for each rating.</h3>
+<div class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>fig, axs <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">15</span>,<span class="dv">5</span>))</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>sns.boxplot(data<span class="op">=</span>vader_nltk, x<span class="op">=</span><span class="st">'rating'</span>, y<span class="op">=</span><span class="st">'neg'</span>, ax<span class="op">=</span>axs[<span class="dv">0</span>])</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>sns.boxplot(data<span class="op">=</span>vader_nltk, x<span class="op">=</span><span class="st">'rating'</span>, y<span class="op">=</span><span class="st">'neu'</span>, ax<span class="op">=</span>axs[<span class="dv">1</span>])</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>sns.boxplot(data<span class="op">=</span>vader_nltk, x<span class="op">=</span><span class="st">'rating'</span>, y<span class="op">=</span><span class="st">'pos'</span>, ax<span class="op">=</span>axs[<span class="dv">2</span>])</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>axs[<span class="dv">0</span>].set_title(<span class="st">'Negative sentiment'</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>axs[<span class="dv">1</span>].set_title(<span class="st">'Neutral sentiment'</span>)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>axs[<span class="dv">2</span>].set_title(<span class="st">'Positive sentiment'</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="index_files/figure-html/cell-6-output-1.png" width="1430" height="470"></p>
+</div>
+</div>
+</section>
+<section id="hugging-face-transformers-to-load-a-pre-trained-model" class="level3">
+<h3 class="anchored" data-anchor-id="hugging-face-transformers-to-load-a-pre-trained-model">7. Hugging Face Transformers to load a pre-trained model:</h3>
+<p>It sets up a sentiment analysis model based on RoBERTa architecture for analyzing the Amazon reviews.</p>
+<div class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>MODEL <span class="op">=</span> <span class="st">"cardiffnlp/twitter-roberta-base-sentiment"</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>tokenizer <span class="op">=</span> AutoTokenizer.from_pretrained(MODEL)</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> AutoModelForSequenceClassification.from_pretrained(MODEL)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="vader-sentiment-analysis-vs.-roberta-model-sentiment-analysis" class="level3">
+<h3 class="anchored" data-anchor-id="vader-sentiment-analysis-vs.-roberta-model-sentiment-analysis">8. VADER Sentiment analysis vs.&nbsp;RoBERTa Model Sentiment Analysis:</h3>
+<section id="vader-score-about-the-review-at-index-30" class="level5">
+<h5 class="anchored" data-anchor-id="vader-score-about-the-review-at-index-30">(1). VADER score about the review at index 30:</h5>
+<div class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>example_review <span class="op">=</span> amazon_df[<span class="st">'reviewText'</span>][<span class="dv">30</span>]</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>example_review</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Vader sentiment analysis scores for the review at index 30 is "</span>, sia.polarity_scores(example_review))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>[1] 2</code></pre>
+<pre><code>Vader sentiment analysis scores for the review at index 30 is  {'neg': 0.0, 'neu': 0.886, 'pos': 0.114, 'compound': 0.6249}</code></pre>
 </div>
 </div>
+</section>
+<section id="roberta-score-about-the-review-at-index-30" class="level5">
+<h5 class="anchored" data-anchor-id="roberta-score-about-the-review-at-index-30">(2).RoBERTa score about the review at index 30:</h5>
+<div class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>encoded_review <span class="op">=</span> tokenizer(example_review, return_tensors<span class="op">=</span><span class="st">'pt'</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>output <span class="op">=</span> model(<span class="op">**</span>encoded_review)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>scores <span class="op">=</span> output[<span class="dv">0</span>][<span class="dv">0</span>].detach().numpy()</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>scores <span class="op">=</span> softmax(scores)</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>scores_dict <span class="op">=</span> {</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">'roberta_neg'</span>: scores[<span class="dv">0</span>],</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">'roberta_neu'</span>: scores[<span class="dv">1</span>],</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">'roberta_pos'</span>: scores[<span class="dv">2</span>]</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Roberta scores for the review at index 30 is "</span>, scores_dict)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Roberta scores for the review at index 30 is  {'roberta_neg': 0.25840575, 'roberta_neu': 0.34866926, 'roberta_pos': 0.39292496}</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="roberta-score-and-vader-score-integration" class="level3">
+<h3 class="anchored" data-anchor-id="roberta-score-and-vader-score-integration">9. RoBERTa score and VADER score Integration:</h3>
+<p>The <strong>res</strong> dictionary combines and contains both the VADER sentiment analysis result and the pre-trained model RoBERTa model’s result.</p>
+<div class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> roberta_scores(example_review):</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  encoded_review <span class="op">=</span> tokenizer(example_review, return_tensors<span class="op">=</span><span class="st">'pt'</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  output <span class="op">=</span> model(<span class="op">**</span>encoded_review)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  scores <span class="op">=</span> output[<span class="dv">0</span>][<span class="dv">0</span>].detach().numpy()</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  scores <span class="op">=</span> softmax(scores)</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>  scores_dict <span class="op">=</span> {</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">'roberta_neg'</span>: scores[<span class="dv">0</span>],</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">'roberta_neu'</span>: scores[<span class="dv">1</span>],</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">'roberta_pos'</span>: scores[<span class="dv">2</span>]</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> scores_dict</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> {}</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, row <span class="kw">in</span> tqdm(amazon_df.iterrows(), total<span class="op">=</span><span class="bu">len</span>(amazon_df)):</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>        review <span class="op">=</span> row[<span class="st">'reviewText'</span>]</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>        review_id <span class="op">=</span> row[<span class="st">'id'</span>]</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">isinstance</span>(review, <span class="bu">str</span>):</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>            vader_result <span class="op">=</span> sia.polarity_scores(review)</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>            vader_result2 <span class="op">=</span> {<span class="ss">f"vader_</span><span class="sc">{</span>key<span class="sc">}</span><span class="ss">"</span>: value <span class="cf">for</span> key, value <span class="kw">in</span> vader_result.items()}</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>            roberta_result <span class="op">=</span> roberta_scores(review)</span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>            res[review_id] <span class="op">=</span> {<span class="op">**</span>vader_result2, <span class="op">**</span>roberta_result}</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f'Skipped id: </span><span class="sc">{</span>review_id<span class="sc">}</span><span class="ss"> due to non-string review'</span>)</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">RuntimeError</span>:</span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>dict_list <span class="op">=</span> <span class="bu">list</span>(res.items())[:<span class="dv">5</span>]</span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> item <span class="kw">in</span> dict_list:</span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(item)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<script type="application/vnd.jupyter.widget-view+json">
+{"model_id":"8240e0f3fc87466983fccaae33e4c20b","version_major":2,"version_minor":0,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
+</script>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>(0, {'vader_neg': 0.688, 'vader_neu': 0.312, 'vader_pos': 0.0, 'vader_compound': -0.296, 'roberta_neg': 0.07495943, 'roberta_neu': 0.5892151, 'roberta_pos': 0.33582547})
+(2, {'vader_neg': 0.077, 'vader_neu': 0.923, 'vader_pos': 0.0, 'vader_compound': -0.3089, 'roberta_neg': 0.42375654, 'roberta_neu': 0.4483106, 'roberta_pos': 0.12793283})
+(11, {'vader_neg': 0.0, 'vader_neu': 1.0, 'vader_pos': 0.0, 'vader_compound': 0.0, 'roberta_neg': 0.2745669, 'roberta_neu': 0.4989962, 'roberta_pos': 0.22643691})
+(32, {'vader_neg': 0.088, 'vader_neu': 0.774, 'vader_pos': 0.138, 'vader_compound': 0.5255, 'roberta_neg': 0.54347664, 'roberta_neu': 0.3384522, 'roberta_pos': 0.118071124})
+(33, {'vader_neg': 0.0, 'vader_neu': 0.632, 'vader_pos': 0.368, 'vader_compound': 0.9153, 'roberta_neg': 0.0029975341, 'roberta_neu': 0.026594352, 'roberta_pos': 0.97040814})</code></pre>
+</div>
+</div>
+</section>
+<section id="merge-into-dataframe" class="level3">
+<h3 class="anchored" data-anchor-id="merge-into-dataframe">10. Merge into dataframe:</h3>
+<div class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>model_df <span class="op">=</span> pd.DataFrame(res).T</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>model_df <span class="op">=</span> model_df.reset_index().rename(columns<span class="op">=</span>{<span class="st">'index'</span>:<span class="st">'id'</span>})</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>model_df <span class="op">=</span> model_df.merge(amazon_df, how<span class="op">=</span><span class="st">'left'</span>)</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>model_df.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<div>
 
 
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">id</th>
+<th data-quarto-table-cell-role="th">vader_neg</th>
+<th data-quarto-table-cell-role="th">vader_neu</th>
+<th data-quarto-table-cell-role="th">vader_pos</th>
+<th data-quarto-table-cell-role="th">vader_compound</th>
+<th data-quarto-table-cell-role="th">roberta_neg</th>
+<th data-quarto-table-cell-role="th">roberta_neu</th>
+<th data-quarto-table-cell-role="th">roberta_pos</th>
+<th data-quarto-table-cell-role="th">reviewerName</th>
+<th data-quarto-table-cell-role="th">rating</th>
+<th data-quarto-table-cell-role="th">reviewText</th>
+<th data-quarto-table-cell-role="th">reviewTime</th>
+<th data-quarto-table-cell-role="th">day_diff</th>
+<th data-quarto-table-cell-role="th">helpful_yes</th>
+<th data-quarto-table-cell-role="th">helpful_no</th>
+<th data-quarto-table-cell-role="th">total_vote</th>
+<th data-quarto-table-cell-role="th">score_pos_neg_diff</th>
+<th data-quarto-table-cell-role="th">score_average_rating</th>
+<th data-quarto-table-cell-role="th">wilson_lower_bound</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>0</td>
+<td>0.688</td>
+<td>0.312</td>
+<td>0.000</td>
+<td>-0.2960</td>
+<td>0.074959</td>
+<td>0.589215</td>
+<td>0.335825</td>
+<td>NaN</td>
+<td>4.0</td>
+<td>No issues.</td>
+<td>2014-07-23</td>
+<td>138</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0.0</td>
+<td>0.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>2</td>
+<td>0.077</td>
+<td>0.923</td>
+<td>0.000</td>
+<td>-0.3089</td>
+<td>0.423757</td>
+<td>0.448311</td>
+<td>0.127933</td>
+<td>1K3</td>
+<td>4.0</td>
+<td>it works as expected. I should have sprung for...</td>
+<td>2012-12-23</td>
+<td>715</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0.0</td>
+<td>0.0</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>11</td>
+<td>0.000</td>
+<td>1.000</td>
+<td>0.000</td>
+<td>0.0000</td>
+<td>0.274567</td>
+<td>0.498996</td>
+<td>0.226437</td>
+<td>98020</td>
+<td>3.0</td>
+<td>It works, but file writes are a bit slower tha...</td>
+<td>2013-11-20</td>
+<td>383</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0.0</td>
+<td>0.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>32</td>
+<td>0.088</td>
+<td>0.774</td>
+<td>0.138</td>
+<td>0.5255</td>
+<td>0.543477</td>
+<td>0.338452</td>
+<td>0.118071</td>
+<td>Abdulrahman J. Alrashed "dr34m3r"</td>
+<td>1.0</td>
+<td>I bought 2 of those SanDisk 32 GB microSD , us...</td>
+<td>2013-03-08</td>
+<td>640</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0.0</td>
+<td>0.0</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>33</td>
+<td>0.000</td>
+<td>0.632</td>
+<td>0.368</td>
+<td>0.9153</td>
+<td>0.002998</td>
+<td>0.026594</td>
+<td>0.970408</td>
+<td>Abel Feliciano "Ace Master"</td>
+<td>4.0</td>
+<td>The memory card is an excellent condition and ...</td>
+<td>2012-11-09</td>
+<td>759</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0.0</td>
+<td>0.0</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+</section>
+<section id="heatmap-to-show-the-relationship-between-vader-sentiment-analysis-tool-and-roberta-training-model" class="level3">
+<h3 class="anchored" data-anchor-id="heatmap-to-show-the-relationship-between-vader-sentiment-analysis-tool-and-roberta-training-model">11. Heatmap to show the relationship between VADER Sentiment analysis tool and RoBERTa training model:</h3>
+<p>The heatmap is applied here to explore the correlation between the VADER model classifications and the RoBERTa model classifications.</p>
+<div class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">4</span>, <span class="dv">3</span>))</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>correlation <span class="op">=</span> model_df[[<span class="st">'vader_neg'</span>, <span class="st">'vader_neu'</span>, <span class="st">'vader_pos'</span>, <span class="st">'roberta_neg'</span>, <span class="st">'roberta_neu'</span>, <span class="st">'roberta_pos'</span>]].corr()</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>sns.heatmap(correlation, annot<span class="op">=</span><span class="va">True</span>, cmap<span class="op">=</span><span class="st">'coolwarm'</span>)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="index_files/figure-html/cell-12-output-1.png" width="369" height="277"></p>
+</div>
+</div>
+<p>From the heatmap shown above, the correlation coefficient of two models’ relationship:</p>
+<ol type="1">
+<li><strong>vader_neg - roberta_neg:</strong> 0.35</li>
+<li><strong>vader_neu - roberta_neu:</strong> 0.36</li>
+<li><strong>vader_pos - roberta_pos:</strong> 0.5</li>
+</ol>
+
+
+</section>
 
 </main> <!-- /main -->
+<script type="application/vnd.jupyter.widget-state+json">
+{"state":{"0074cbf3ccee46139fa5819236e50bf0":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HTMLView","description":"","description_allow_html":false,"layout":"IPY_MODEL_1d6770475e0545f6889a82b2691d340b","placeholder":"​","style":"IPY_MODEL_60ded65ae33d44fea5ecfd1cbc0111ad","tabbable":null,"tooltip":null,"value":" 2284/2284 [09:55&lt;00:00,  3.65it/s]"}},"06578be5364945c7b4f534cc60daea2d":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":null,"description_width":""}},"1d6770475e0545f6889a82b2691d340b":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"1e74839477d648b6aae021fcb3bd0160":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","background":null,"description_width":"","font_size":null,"text_color":null}},"3e1fff0886a149d8b992e9d167395552":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HBoxModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HBoxModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HBoxView","box_style":"","children":["IPY_MODEL_90b84ab6303a48f5ae902ab6e662393d","IPY_MODEL_ae53a14fc18f45b0ac79f704fdb3c221","IPY_MODEL_a049b1ee293740dda372e30ef474b1c4"],"layout":"IPY_MODEL_ad0ae4bf27d2433a9d0aaa3fed89222b","tabbable":null,"tooltip":null}},"3ee61f06d640454ea37bb9fb054b0332":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","background":null,"description_width":"","font_size":null,"text_color":null}},"5da08305bf294715ae2537096d390aa1":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"60ded65ae33d44fea5ecfd1cbc0111ad":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","background":null,"description_width":"","font_size":null,"text_color":null}},"69bd538fb7334017994684008e21d7ef":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"6ad62326c6be455ba26ec75ce9da40b9":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"success","description":"","description_allow_html":false,"layout":"IPY_MODEL_9a9647777f7a488781e169a49276db0c","max":2284,"min":0,"orientation":"horizontal","style":"IPY_MODEL_06578be5364945c7b4f534cc60daea2d","tabbable":null,"tooltip":null,"value":2284}},"6c1cca84a7af4d8085a77ead06f5997c":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"7d19720b37e0475591d67aef42e20a88":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","background":null,"description_width":"","font_size":null,"text_color":null}},"8240e0f3fc87466983fccaae33e4c20b":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HBoxModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HBoxModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HBoxView","box_style":"","children":["IPY_MODEL_b2277bc6c57346999c556fc258d58136","IPY_MODEL_6ad62326c6be455ba26ec75ce9da40b9","IPY_MODEL_0074cbf3ccee46139fa5819236e50bf0"],"layout":"IPY_MODEL_5da08305bf294715ae2537096d390aa1","tabbable":null,"tooltip":null}},"843b4ffebf994102a4e13b1a6a47bb5c":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"90b84ab6303a48f5ae902ab6e662393d":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HTMLView","description":"","description_allow_html":false,"layout":"IPY_MODEL_6c1cca84a7af4d8085a77ead06f5997c","placeholder":"​","style":"IPY_MODEL_3ee61f06d640454ea37bb9fb054b0332","tabbable":null,"tooltip":null,"value":"100%"}},"9a9647777f7a488781e169a49276db0c":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"a049b1ee293740dda372e30ef474b1c4":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HTMLView","description":"","description_allow_html":false,"layout":"IPY_MODEL_843b4ffebf994102a4e13b1a6a47bb5c","placeholder":"​","style":"IPY_MODEL_1e74839477d648b6aae021fcb3bd0160","tabbable":null,"tooltip":null,"value":" 2284/2284 [00:01&lt;00:00, 1543.78it/s]"}},"ad0ae4bf27d2433a9d0aaa3fed89222b":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"ae53a14fc18f45b0ac79f704fdb3c221":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"success","description":"","description_allow_html":false,"layout":"IPY_MODEL_c2c9430ff99d45fc84c3d89fe413ceec","max":2284,"min":0,"orientation":"horizontal","style":"IPY_MODEL_e9f29ebcae384b3ba631cd69a39ef0cd","tabbable":null,"tooltip":null,"value":2284}},"b2277bc6c57346999c556fc258d58136":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"HTMLModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"HTMLModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"HTMLView","description":"","description_allow_html":false,"layout":"IPY_MODEL_69bd538fb7334017994684008e21d7ef","placeholder":"​","style":"IPY_MODEL_7d19720b37e0475591d67aef42e20a88","tabbable":null,"tooltip":null,"value":"100%"}},"c2c9430ff99d45fc84c3d89fe413ceec":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":null}},"e9f29ebcae384b3ba631cd69a39ef0cd":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":null,"description_width":""}}},"version_major":2,"version_minor":0}
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {
