@@ -3,7 +3,6 @@ title: "Classification"
 author: "Youwei Chen"
 date: "2023-11-28"
 categories: [NLP, code, sentiment analysis, classification]
-image: "image.jpg"
 ---
 
 ### 1. Introduction:

@@ -1,13 +1,93 @@
 ---
 title: "Anomaly/outlier detection"
 author: "Youwei Chen"
-date: "2023-09-12"
-categories: [news, code, analysis]
-image: "image.jpg"
+date: "2023-12-03"
+categories: [anomaly detection, code, machine learning, DBSCAN, Isolation Forest]
 ---
 
-This is a post with executable code.
+### 1.Introduction:
 
-```{r}
-1 + 1
+This blog aims to provide a comprehensive approach to identify anomalies in student math scores and visualizing the results. It uses boxplot to display the distribution of students' math scores and the **Isolation Forest model** to detect these anomalies.**DBSCAN labels** for scatterplot is used to better view the clusters and visualization.
+
+### 2. Import libraries:
+
+```{python}
+import pandas as pd
+import numpy as np
+from sklearn.ensemble import IsolationForest
+from sklearn.cluster import DBSCAN
+import matplotlib.pyplot as plt
+import seaborn as sns
+```
+
+### 3. Read the CSV file:
+
+```{python}
+student_df = pd.read_csv('student_data.csv')
+student_df.head()
+```
+
+### 4. Define the anomaly in the context:
+
+The math score is considered as anomaly if the score is higher than 100. It creates a new column **actualy_anomaly** in the dataframe to indicate whether the data is anomaly.
+
+```{python}
+student_df['actual_anomaly'] = student_df['math_score'] > 100
+student_df.head()
+```
+
+### 5. Visualizing students' math scores using Boxplot:
+
+Boxplot is a great way of displaying and showing the distribution of students' math scores. It can show us about outliers intuitively and what their values are.
+
+```{python}
+sns.boxplot(x=student_df.math_score)
+plt.show()
+```
+
+### 6. Fitting an Isolation Forest Model for Anomaly Detection:
+
+It uses Isolation Forest model algorithm for anomaly detection. The model is fitted to the **math_score** column of the **student_df** DataFrame to detect any anomalies in the math scores of the students.
+
+```{python}
+model = IsolationForest(n_estimators=100, max_samples='auto', contamination=float(0.15), max_features=1.0)
+model.fit(student_df[['math_score']])
+```
+
+### 7. Predicting anomalies in Student Math Scores:
+
+It uses trained Isolation Forest model to predict anomalies in the **math_score** column of the **student_df** dataframe. **model.decision_function** will compute and return the anomaly score for each math score.
+
+```{python}
+student_df['anomalies_scores'] = model.decision_function(student_df[['math_score']])
+student_df['anomaly'] = model.predict(student_df[['math_score']])
+student_df.head(20)
+```
+
+### 8. Calculating the accuracy of the model:
+
+It calculates the accuracy of the anomaly detection model.
+
+```{python}
+correct_anomalies = student_df[(student_df['anomaly'] == -1) & (student_df['actual_anomaly'])].shape[0]
+
+
+total_anomalies = student_df['actual_anomaly'].sum()
+
+accuracy = 100 * correct_anomalies / total_anomalies
+accuracy
+```
+
+### 9. Using scatter plots to clustering students with DBSCAN:
+
+```{python}
+from sklearn.preprocessing import StandardScaler
+student_df['math_score_scaled'] = StandardScaler().fit_transform(student_df[['math_score']])
+db = DBSCAN(eps=0.2, min_samples=2).fit(student_df[['math_score_scaled']])
+
+student_df['dbscan_label'] = db.labels_
+plt.figure(figsize=(10, 5))
+sns.scatterplot(x=student_df.index, y='math_score_scaled', hue='dbscan_label', data=student_df, palette='coolwarm')
+plt.xlabel("student_id")
+plt.show()
 ```

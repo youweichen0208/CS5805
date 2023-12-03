@@ -1,12 +1,88 @@
 ---
 title: "Linear and nonlinear regression"
 author: "Youwei Chen"
-date: "2023-11-20"
-categories: [news]
+date: "2023-11-29"
+categories: [regression, scatterplot, machine learning, housing price prediction]
 ---
 
-This is the first post in a Quarto blog. Welcome!
+### 1. Introduction:
 
-![](thumbnail.jpg)
+This blog aims to use **linear regression** model to predict housing prices in CA. It will perform feature selection based on the correlation of housing attributes. The **linear regression** model is later trained using the selected features. It also includes a **scatterplot** to assess the model's performance and a **best-fit line** to show accuracy.
 
-Since this post doesn't specify an explicit `image`, the first image in the post will be used in the listing page of posts.
+### 2. Import libraries:
+
+```{python}
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+```
+
+### 3. Open the csv file:
+
+```{python}
+ca_df = pd.read_csv('california-housing.csv')
+print(ca_df.head())
+```
+
+### 4. Correlation Feature selection:
+
+The code calculates the correlation coefficients of the housing attributes. It then selects the attributes that meet the threshold requirement.
+
+```{python}
+correlation_with_price = ca_df.drop('ocean_proximity', axis=1).corr()['house_value']
+
+selected_features = correlation_with_price[(correlation_with_price >= 0.1) | (correlation_with_price <= -0.1)].index
+
+print(f'Selected features: {selected_features}')
+```
+
+### 5.Build the linear regression model from the selected correlated features:
+
+The linear regression model takes selected features and **house_value** to train. The model is able to predict house values, and they are evaluated using **Mean Squared Error (MSE)** and **R-squared metrics**.
+
+```{python}
+x = ca_df[selected_features].drop('house_value', axis=1)
+y = ca_df['house_value']
+
+X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=30)
+
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+print(f'Mean Squared Error: {mse}\nR-squared: {r2}')
+```
+
+### 6. Scatterplot to assess the performance of the regression model:
+
+The scatterplot is used to visualize the actual vs. predicted housing values from the regression model. The best fit red line is also plotted on the scatter plot.
+
+```{python}
+slope, intercept = np.polyfit(y_test, y_pred, 1)
+best_fit_line = np.poly1d([slope, intercept])
+
+plt.figure(figsize=(8, 6))
+plt.scatter(y_test, y_pred)
+plt.plot(y_test, best_fit_line(y_test), 'r-', lw=2)
+plt.xlabel('Actual house value')
+plt.ylabel('Predicted house value')
+plt.title('Actual vs Predicted House Values')
+plt.show()
+```
+
+### 7. Predicting the house price with the regression model:
+
+In this case, the new house has features with **latitude** 37.85, **housing_median age** 50, **total_rooms**: 2200, **median_income**: 2.6059
+
+```{python}
+# [latitude, housing_median_age, total_rooms, median_income]
+new_house = pd.DataFrame([[37.85, 50, 2200, 2.6059]], columns=X_train.columns)
+predicted_price = model.predict(new_house)
+print("Predicted Price: ", predicted_price[0])
+```

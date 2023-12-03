@@ -3,7 +3,6 @@ title: "Probability theory and random variables"
 author: "Youwei Chen"
 date: "2023-11-22"
 categories: [machine learning, python, data visualization]
-image: "image.jpg"
 jupyter:
   kernelspec:
     name: python3
